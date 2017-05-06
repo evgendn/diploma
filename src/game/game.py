@@ -1,18 +1,20 @@
+import collections
 import os
 import sys
 import pygame
+from random import randint
 from pygame.locals import *
 
 from game_utils import *
 
 
-WINDOW_WIDTH = 480
-WINDOW_HEIGHT = 600
+WINDOW_WIDTH = 404
+WINDOW_HEIGHT = 500
 
 
 class Bird(pygame.sprite.Sprite):
-    GRAVITY = 0.5
-    STANDART_SPEED = 0.8
+    GRAVITY = 0.6
+    STANDART_SPEED = 0.4
 
     def __init__(self, x, y):
         pygame.sprite.Sprite.__init__(self)
@@ -32,21 +34,35 @@ class Bird(pygame.sprite.Sprite):
         self.velocity -= Bird.STANDART_SPEED * 20
         if self.velocity < self.limit_speed:
             self.velocity = self.limit_speed
-        print(self.velocity)
 
 
 class Pipe(pygame.sprite.Sprite):
-    SCROLL_SPEED = 1
+    SCROLL_SPEED = 3
+    GAP = 100
+    FLUCTUATION = 150
+    LOWEST_BORDER = 160
+    WIDTH = 52
 
-    def __init__(self, x, y):
+    def __init__(self, x):
         pygame.sprite.Sprite.__init__(self)
         self.x = x
-        self.y = y
+        self.y = {}
         self.velocity = 0.1
+        self.top_image = pygame.transform.rotate(
+            load_png("pipe-red.png"), 180)
+        self.bottom_image = load_png("pipe-red.png")
+        self.reposition()
 
     def update(self):
-        pass
+        self.x -= Pipe.SCROLL_SPEED
 
+        if self.x + Pipe.WIDTH < 0:
+            self.reposition()
+            self.x = WINDOW_WIDTH
+
+    def reposition(self):
+        self.y["bottom"] = randint(1, Pipe.FLUCTUATION) + Pipe.GAP + Pipe.LOWEST_BORDER
+        self.y["top"] = self.y["bottom"] - Pipe.GAP - self.bottom_image.get_height()
 
 class Game():
     def __init__(self):
@@ -66,6 +82,10 @@ def main():
 
     # Game objects
     bird = Bird(20, WINDOW_HEIGHT / 2)
+    pipes = [Pipe(WINDOW_WIDTH),
+             Pipe(WINDOW_WIDTH + Pipe.WIDTH + Pipe.GAP),
+             Pipe(WINDOW_WIDTH + (Pipe.WIDTH + Pipe.GAP) * 2)
+        ]
     clock = pygame.time.Clock()
 
     screen.blit(background, (0, 0))
@@ -81,12 +101,29 @@ def main():
                 if event.key == K_SPACE:
                     bird.lift()
 
+        # Check collision
+        if bird.y + bird.image.get_height() > WINDOW_HEIGHT:
+            bird.y = WINDOW_HEIGHT - bird.image.get_height()
+            bird.velocity = 0
+        elif bird.y < 0:
+            bird.y = 0
+            bird.velocity = 0
+        # Check score
+
+        # Update bird and pipes
+        bird.update()
+        for pipe in pipes:
+            pipe.update()
+
+
+        # Check game over
+
         # Redraw objects
         screen.fill((0, 0, 0))
         screen.blit(bird.image, (bird.x, bird.y))
-
-        # Update objects
-        bird.update()
+        for pipe in pipes:
+            screen.blit(pipe.top_image, (pipe.x, pipe.y["top"]))
+            screen.blit(pipe.bottom_image, (pipe.x, pipe.y["bottom"]))
 
         # Update display
         pygame.display.flip()
