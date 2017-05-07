@@ -24,7 +24,6 @@ class Bird(pygame.sprite.Sprite):
         self.limit_speed = -8
         self.is_lift = False
         self.image = load_png("bluebird-midflap.png")
-        self.rect = self.image.get_rect()
 
     def update(self):
         self.velocity += Bird.GRAVITY
@@ -35,6 +34,10 @@ class Bird(pygame.sprite.Sprite):
         if self.velocity < self.limit_speed:
             self.velocity = self.limit_speed
 
+    def rect(self):
+        return Rect(self.x, self.y,
+                    self.image.get_width(), self.image.get_height())
+
 
 class Pipe(pygame.sprite.Sprite):
     SCROLL_SPEED = 3
@@ -42,6 +45,7 @@ class Pipe(pygame.sprite.Sprite):
     FLUCTUATION = 150
     LOWEST_BORDER = 160
     WIDTH = 52
+    HEIGHT = 320
 
     def __init__(self, x):
         pygame.sprite.Sprite.__init__(self)
@@ -52,6 +56,8 @@ class Pipe(pygame.sprite.Sprite):
             load_png("pipe-red.png"), 180)
         self.bottom_image = load_png("pipe-red.png")
         self.reposition()
+        # Flag for scor counting
+        self.bird_passed = False
 
     def update(self):
         self.x -= Pipe.SCROLL_SPEED
@@ -61,12 +67,16 @@ class Pipe(pygame.sprite.Sprite):
             self.x = WINDOW_WIDTH
 
     def reposition(self):
+        self.bird_passed = False
         self.y["bottom"] = randint(1, Pipe.FLUCTUATION) + Pipe.GAP + Pipe.LOWEST_BORDER
         self.y["top"] = self.y["bottom"] - Pipe.GAP - self.bottom_image.get_height()
 
-class Game():
-    def __init__(self):
-        pass
+    def rect(self):
+        top_rect = Rect(self.x, self.y["top"],
+                        Pipe.WIDTH, Pipe.HEIGHT)
+        bottom_rect = Rect(self.x, self.y["bottom"],
+                           Pipe.WIDTH, Pipe.HEIGHT)
+        return top_rect, bottom_rect
 
 
 def main():
@@ -76,9 +86,10 @@ def main():
     pygame.display.set_caption("Flappy Bird clone")
     pygame.mouse.set_visible(False)
 
+    color = (0, 0, 0)
     background = pygame.Surface(screen.get_size())
     background = background.convert()
-    background.fill((0, 0, 0))
+    background.fill(color)
 
     # Game objects
     bird = Bird(20, WINDOW_HEIGHT / 2)
@@ -87,6 +98,7 @@ def main():
              Pipe(WINDOW_WIDTH + (Pipe.WIDTH + Pipe.GAP) * 2)
         ]
     clock = pygame.time.Clock()
+    score = 0
 
     screen.blit(background, (0, 0))
     pygame.display.flip()
@@ -102,13 +114,36 @@ def main():
                     bird.lift()
 
         # Check collision
+        # Window border and bird
         if bird.y + bird.image.get_height() > WINDOW_HEIGHT:
             bird.y = WINDOW_HEIGHT - bird.image.get_height()
             bird.velocity = 0
         elif bird.y < 0:
             bird.y = 0
             bird.velocity = 0
+
+        # Pipes and bird
+        collision = False
+        for pipe in pipes:
+            top_rect, bottom_rect = pipe.rect()
+            if bird.rect().colliderect(top_rect)\
+               or bird.rect().colliderect(bottom_rect):
+                collision = True
+
+        if collision:
+            pass
+
         # Check score
+        # Check position bird and pipes and increment
+        # score of pipe position less then bird.
+        # Shitty solution i suppose.
+        for pipe in pipes:
+            if pipe.bird_passed is False:
+                if pipe.x + Pipe.WIDTH < bird.x:
+                    score += 1
+                    pipe.bird_passed = True
+
+        print(score)
 
         # Update bird and pipes
         bird.update()
@@ -119,7 +154,7 @@ def main():
         # Check game over
 
         # Redraw objects
-        screen.fill((0, 0, 0))
+        screen.fill(color)
         screen.blit(bird.image, (bird.x, bird.y))
         for pipe in pipes:
             screen.blit(pipe.top_image, (pipe.x, pipe.y["top"]))
