@@ -54,7 +54,7 @@ class Pipe(pygame.sprite.Sprite):
         pygame.sprite.Sprite.__init__(self)
         self.x = x
         self.y = {}
-        self.velocity = 3
+        self.velocity = 4.5
         # For stopping Pipes
         self.moving = True
         self.top_image = pygame.transform.rotate(
@@ -204,6 +204,9 @@ class Game:
         for number in splitted_score:
             self.screen.blit(self.score_numbers[number], (x, y))
             x += width
+
+    def get_resolutoin(self):
+        return self.WINDOW_WIDTH, self.WINDOW_HEIGHT
 
 
 if __name__ == "__main__":
