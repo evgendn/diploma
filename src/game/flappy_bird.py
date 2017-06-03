@@ -2,7 +2,7 @@ import pygame
 from random import randint
 from pygame.locals import *
 
-from game_utils import *
+from utils import *
 
 
 class Bird(pygame.sprite.Sprite):
@@ -170,6 +170,9 @@ class Game:
 
             # Update display
             pygame.display.flip()
+
+    def next_state(self, action):
+        pass
 
     def check_collision(self):
         # Window border and bird
