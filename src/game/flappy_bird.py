@@ -172,7 +172,53 @@ class Game:
             pygame.display.flip()
 
     def next_state(self, action):
-        pass
+        if sum(action) != 1:
+            raise ValueError("Multiple input actions!")
+
+        terminal = False
+        reward = 0.1
+
+        # action[0] == 1: do nothing
+        # action[1] == 1: lift
+        if action[1] == 1:
+            self.bird.lift()
+
+        # Check collision
+        if self.check_collision():
+            terminal = True
+            self.__init__()
+            reward = -1
+
+        # Check score
+        # Check position bird, pipes and increment
+        # score if pipe position less then bird.
+        # Shitty solution i suppose.
+        for pipe in self.pipes:
+            if pipe.bird_passed is False:
+                if pipe.x + Pipe.WIDTH < self.bird.x:
+                    self.score += 1
+                    pipe.bird_passed = True
+                    reward = 1
+
+        # Update bird and pipes
+        self.bird.update()
+        for pipe in self.pipes:
+            pipe.update()
+
+        # Redraw objects
+        # self.screen.fill((0, 0, 0))
+        self.screen.blit(self.background, (0, 0))
+        self.screen.blit(self.bird.image,
+                         (self.bird.x, self.bird.y))
+        for pipe in self.pipes:
+            self.screen.blit(pipe.top_image, (pipe.x, pipe.y["top"]))
+            self.screen.blit(pipe.bottom_image, (pipe.x, pipe.y["bottom"]))
+        self.draw_score()
+
+        image_data = pygame.surfarray.array3d(pygame.display.get_surface())
+        pygame.display.update()
+        self.clock.tick(30)
+        return image_data, reward, terminal
 
     def check_collision(self):
         # Window border and bird
