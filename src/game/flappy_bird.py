@@ -17,7 +17,7 @@ class Bird(pygame.sprite.Sprite):
         # For stopping bird
         self.moving = True
         self.limit_speed = -8
-        self.image = load_png("bluebird-midflap.png")
+        self.image = load_png("yellowbird-midflap.png")
         # For reset game
         self.old_x = x
         self.old_y = y
@@ -45,7 +45,7 @@ class Bird(pygame.sprite.Sprite):
 
 class Pipe(pygame.sprite.Sprite):
     GAP = 100
-    FLUCTUATION = 150
+    FLUCTUATION = 100
     LOWEST_BORDER = 160
     WIDTH = 52
     HEIGHT = 320
@@ -58,8 +58,8 @@ class Pipe(pygame.sprite.Sprite):
         # For stopping Pipes
         self.moving = True
         self.top_image = pygame.transform.rotate(
-            load_png("pipe-red.png"), 180)
-        self.bottom_image = load_png("pipe-red.png")
+            load_png("pipe-green.png"), 180)
+        self.bottom_image = load_png("pipe-green.png")
         self.reposition()
         # Flag for score counting
         self.bird_passed = False
@@ -73,12 +73,17 @@ class Pipe(pygame.sprite.Sprite):
 
             if self.x + Pipe.WIDTH < 0:
                 self.reposition()
-                self.x = Game.WINDOW_WIDTH
+                # screen width = 288, 1 pipe + 2 gaps = 252
+                # 288 - 252 = 36 on  both pipes, 36 / 2 = 16
+                # night mindstorm
+                self.x = Game.WINDOW_WIDTH + self.GAP + 16
 
     def reposition(self):
         self.bird_passed = False
-        self.y["bottom"] = randint(1, Pipe.FLUCTUATION) + Pipe.GAP + Pipe.LOWEST_BORDER
-        self.y["top"] = self.y["bottom"] - Pipe.GAP - self.bottom_image.get_height()
+        self.y["bottom"] = randint(1, Pipe.FLUCTUATION) + Pipe.GAP \
+                           + Pipe.LOWEST_BORDER
+        self.y["top"] = self.y["bottom"] - Pipe.GAP \
+                        - self.bottom_image.get_height()
 
     def rect(self):
         top_rect = Rect(self.x, self.y["top"],
@@ -94,9 +99,22 @@ class Pipe(pygame.sprite.Sprite):
         self.bird_passed = False
 
 
+class Base:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+        self.image = load_png("base.png")
+        self.shift = 0
+        self.moving = True
+
+    def update(self):
+        if self.moving:
+            self.x = -((-self.x + 100) % self.shift)
+
+
 class Game:
-    WINDOW_WIDTH = 404
-    WINDOW_HEIGHT = 500
+    WINDOW_WIDTH = 288
+    WINDOW_HEIGHT = 512
 
     def __init__(self):
         # Screen init.
@@ -112,14 +130,15 @@ class Game:
                       Pipe(Game.WINDOW_WIDTH + Pipe.WIDTH + Pipe.GAP),
                       Pipe(Game.WINDOW_WIDTH + (Pipe.WIDTH + Pipe.GAP) * 2)
                       ]
+        self.base = Base(0, self.WINDOW_HEIGHT - 112)
+        self.base.shift = self.base.image.get_width() - self.WINDOW_WIDTH
         self.clock = pygame.time.Clock()
         self.score = 0
         self.start = False
-        self.background = pygame.transform.scale(load_png("background-day.png"),
-                                                 (Game.WINDOW_WIDTH, Game.WINDOW_HEIGHT))
+        self.background = pygame.transform.scale(load_png("background-black.png"),
+                                                 (Game.WINDOW_WIDTH,
+                                                  Game.WINDOW_HEIGHT))
         self.score_numbers = [load_png("{}.png".format(i)) for i in range(10)]
-
-        pygame.display.flip()
 
     def main_loop(self):
         # Event loop
@@ -139,7 +158,7 @@ class Game:
                             pipe.reset()
                         self.score = 0
 
-            # Check collision
+            #Check collision
             if self.check_collision():
                 self.stop()
 
@@ -149,29 +168,33 @@ class Game:
             # Shitty solution i suppose.
             for pipe in self.pipes:
                 if pipe.bird_passed is False:
-                    if pipe.x + Pipe.WIDTH < self.bird.x:
+                    middle_pipe_pos = pipe.x + Pipe.WIDTH / 2
+                    middle_bird_pos = self.bird.x + self.bird.image.get_width() / 2
+                    if middle_bird_pos > middle_pipe_pos:
                         self.score += 1
                         pipe.bird_passed = True
+                        reward = 1
 
-            # Update bird and pipes
+            # Update bird, pipes and base
             self.bird.update()
             for pipe in self.pipes:
                 pipe.update()
+            self.base.update()
 
             # Redraw objects
-            # self.screen.fill((0, 0, 0))
             self.screen.blit(self.background, (0, 0))
             self.screen.blit(self.bird.image,
                              (self.bird.x, self.bird.y))
             for pipe in self.pipes:
                 self.screen.blit(pipe.top_image, (pipe.x, pipe.y["top"]))
                 self.screen.blit(pipe.bottom_image, (pipe.x, pipe.y["bottom"]))
+            self.screen.blit(self.base.image, (self.base.x, self.base.y))
             self.draw_score()
 
             # Update display
             pygame.display.flip()
 
-    def next_state(self, action):
+    def next_frame(self, action):
         if sum(action) != 1:
             raise ValueError("Multiple input actions!")
 
@@ -185,9 +208,10 @@ class Game:
 
         # Check collision
         if self.check_collision():
+            self.stop()
             terminal = True
             self.__init__()
-            reward = -1
+            reward = -1.0
 
         # Check score
         # Check position bird, pipes and increment
@@ -195,15 +219,18 @@ class Game:
         # Shitty solution i suppose.
         for pipe in self.pipes:
             if pipe.bird_passed is False:
-                if pipe.x + Pipe.WIDTH < self.bird.x:
+                middle_pipe_pos = pipe.x + Pipe.WIDTH / 2
+                middle_bird_pos = self.bird.x + self.bird.image.get_width() / 2
+                if middle_bird_pos > middle_pipe_pos:
                     self.score += 1
                     pipe.bird_passed = True
-                    reward = 1
+                    reward = 1.0
 
-        # Update bird and pipes
+        # Update bird, pipes and base
         self.bird.update()
         for pipe in self.pipes:
             pipe.update()
+        self.base.update()
 
         # Redraw objects
         # self.screen.fill((0, 0, 0))
@@ -213,7 +240,8 @@ class Game:
         for pipe in self.pipes:
             self.screen.blit(pipe.top_image, (pipe.x, pipe.y["top"]))
             self.screen.blit(pipe.bottom_image, (pipe.x, pipe.y["bottom"]))
-        self.draw_score()
+        self.screen.blit(self.base.image, (self.base.x, self.base.y))
+        # self.draw_score()
 
         image_data = pygame.surfarray.array3d(pygame.display.get_surface())
         pygame.display.update()
@@ -240,6 +268,7 @@ class Game:
         self.bird.moving = False
         for pipe in self.pipes:
             pipe.moving = False
+        self.base.moving = False
 
     def draw_score(self):
         splitted_score = [int(i) for i in list(str(self.score))]
