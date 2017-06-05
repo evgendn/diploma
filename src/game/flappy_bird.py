@@ -111,6 +111,9 @@ class Base:
         if self.moving:
             self.x = -((-self.x + 100) % self.shift)
 
+    def reset(self):
+        self.moving = True
+
 
 class Game:
     WINDOW_WIDTH = 288
@@ -156,6 +159,7 @@ class Game:
                         self.bird.reset()
                         for pipe in self.pipes:
                             pipe.reset()
+                        self.base.reset()
                         self.score = 0
 
             #Check collision
@@ -195,6 +199,8 @@ class Game:
             pygame.display.flip()
 
     def next_frame(self, action):
+        pygame.event.pump()
+
         if sum(action) != 1:
             raise ValueError("Multiple input actions!")
 
@@ -249,9 +255,9 @@ class Game:
         return image_data, reward, terminal
 
     def check_collision(self):
-        # Window border and bird
-        if self.bird.y + self.bird.image.get_height() > Game.WINDOW_HEIGHT:
-            self.bird.y = Game.WINDOW_HEIGHT - self.bird.image.get_height()
+        # top window border and bird, base and bird
+        if self.bird.y + self.bird.image.get_height() > self.base.y:
+            self.bird.y = self.base.y - self.bird.image.get_height()
             return True
         elif self.bird.y < 0:
             self.bird.y = 0
@@ -287,6 +293,10 @@ class Game:
         return self.WINDOW_WIDTH, self.WINDOW_HEIGHT
 
 
-if __name__ == "__main__":
+def main():
     game = Game()
     game.main_loop()
+
+
+if __name__ == "__main__":
+    main()
