@@ -1,4 +1,5 @@
 import numpy as np
+import os
 import random
 import tensorflow as tf
 
@@ -6,37 +7,45 @@ from collections import deque
 
 
 class DQN:
-    FINAL_EPSILON = 0.1
-    INITIAL_EPSILON = 1.0
+    SAVE_EVERY_X_STEPS = 10000
 
     def __init__(self, actions, max_replay_memory, observe,
-                 explore, statuses, game_name="game"):
+                 explore, statuses, learning_rate, batch_size,
+                 gamma, initial_epsilon, final_epsilon, game_name="game"):
         self.actions = actions
         self.max_replay_memory = max_replay_memory
         self.observe = observe
         self.explore = explore
         self.statuses = statuses
+        self.learning_rate = learning_rate
+        self.epsilon = self.initial_epsilon = initial_epsilon
+        self.final_epsilon = final_epsilon
         self.game_name = game_name
+        self.batch_size = batch_size
+        self.gamma = gamma
 
-        self.batch_size = 32
-        self.gamma = 0.9
-        self.epsilon = self.INITIAL_EPSILON
         self.replay_memory = deque()
         self.image_size = 84
         self.current_state = None
-        self.input_layer, self.output_layer = self.create_network
+        self.input_layer, self.output_layer = self.create_network()
         self.time_step = 0
         self.checkpoint_path = "saved_networks"
 
+        # form tensorflow graph
         # define cost function
         self.action_input = tf.placeholder(tf.float32, [None, self.actions])
         self.target = tf.placeholder(tf.float32, [None])
-        q_action = tf.reduce_sum(tf.multiply(self.output_layer, self.action_input),
-                                 reduction_indices=1)
-        cost = tf.reduce_mean(tf.square(self.target - q_action))
-        self.train_step = tf.train.AdamOptimizer(1e-6).minimize(cost)
+        q_value = tf.reduce_sum(tf.multiply(self.output_layer,
+                                            self.action_input),
+                                reduction_indices=1)
+        cost = tf.reduce_mean(tf.square(self.target - q_value))
+        # optimizer
+        self.optimizer = tf.train.AdamOptimizer(self.learning_rate).minimize(cost)
 
         # saving and loading nn
+        if not os.path.exists(self.checkpoint_path):
+            os.mkdir(self.checkpoint_path)
+
         self.saver = tf.train.Saver()
         self.session = tf.InteractiveSession()
         self.session.run(tf.initialize_all_variables())
@@ -47,7 +56,6 @@ class DQN:
         else:
             print("Could not find old network weights")
 
-    @property
     def create_network(self):
         # network weights
         layer1_weights = self.init_weights([8, 8, 4, 32])
@@ -66,7 +74,8 @@ class DQN:
         layer5_bias = self.init_biases([self.actions])
 
         # model nn
-        input_layer = tf.placeholder(tf.float32, [None, self.image_size, self.image_size, 4])
+        input_layer = tf.placeholder(tf.float32, [None, self.image_size,
+                                                  self.image_size, 4])
         # first convolutional layer: 32 filters, 8x8, 4 strides
         conv_layer1 = tf.nn.relu(self.conv2d(input_layer, layer1_weights, 4)
                                  + layer1_bias)
@@ -80,13 +89,13 @@ class DQN:
         conv_layer3 = tf.nn.relu(self.conv2d(conv_layer2, layer3_weights, 1)
                                  + layer3_bias)
         # reshape to 2d tensor
-        shape = conv_layer3.get_shape()
-
-        # print("dimension: {0}".format(str(shape[1] * shape[2] * shape[3]))) = 2304
+        # print("dimension: {0}".format(str(shape[1] * shape[2] * shape[3])))
+        # >>> 2304
         conv_layer3_2d = tf.reshape(conv_layer3, [-1, 2304])
 
         # fourth full-connected layer
-        fc_layer4 = tf.nn.relu(tf.matmul(conv_layer3_2d, layer4_weights) + layer4_bias)
+        fc_layer4 = tf.nn.relu(tf.matmul(conv_layer3_2d, layer4_weights)
+                               + layer4_bias)
 
         # fifth full-connected layer: Q-value
         output_layer = tf.matmul(fc_layer4, layer5_weights) + layer5_bias
@@ -103,47 +112,52 @@ class DQN:
 
         # calculate target value
         target_batch = []
-        q_value_batch = self.output_layer.eval(feed_dict={self.input_layer: next_state_batch})
+        q_value_batch = self.output_layer.eval(feed_dict={
+                                                   self.input_layer:
+                                                       next_state_batch
+                                               })
         for i in range(0, self.batch_size):
             terminal = minibatch[i][self.statuses["terminate"]]
             if terminal:
                 target_batch.append(reward_batch[i])
             else:
-                target_batch.append(reward_batch * self.gamma * np.max(q_value_batch[i]))
+                target_batch.append(reward_batch[i] + self.gamma
+                                    * np.max(q_value_batch[i]))
 
         # perform gradient step
-        self.train_step.run(feed_dict={
+        self.optimizer.run(feed_dict={
             self.action_input: action_batch,
             self.target: target_batch,
             self.input_layer: state_batch
         })
 
-        # saving network
-        if self.time_step % 10000 == 0:
-            self.saver.save(self.session, "saved_networks/" + self.game_name + "-dqn",
-                            global_step=self.time_step)
-
     def get_action(self):
-        q_value = self.output_layer.eval(feed_dict={self.input_layer: [self.current_state]})[0]
+        q_value = self.output_layer.eval(feed_dict={
+                                            self.input_layer: [
+                                                self.current_state
+                                                ]
+                                         })[0]
         action = np.zeros(self.actions)
         action_index = 0
         if random.random() <= self.epsilon:
             action_index = random.randrange(self.actions)
-            action[action_index] = 1
         else:
             action_index = np.argmax(q_value)
-            action[action_index] = 1
+        action[action_index] = 1
 
-        if self.epsilon > self.FINAL_EPSILON and self.time_step > self.observe:
-            self.epsilon -= (self.INITIAL_EPSILON - self.FINAL_EPSILON) / self.explore
+        if self.epsilon > self.final_epsilon and self.time_step > self.observe:
+            self.epsilon -= (self.initial_eplsion - self.final_epsilon) \
+                            / self.explore
 
-        return action
+        return action, q_value
 
-    def fitc(self, next_state, action, reward, terminal):
+    def fit(self, next_state, action, reward, terminal):
         # the observe of the environment
-        new_state = np.append(next_state, self.current_state[:, :, 1:], axis=2)
-        self.replay_memory.append((self.current_state, action, reward, new_state, terminal))
+        new_state = np.append(next_state, self.current_state[:, :, :3], axis=2)
 
+        # store the state im memory
+        self.replay_memory.append((self.current_state, action, reward,
+                                   new_state, terminal))
         if len(self.replay_memory) > self.max_replay_memory:
             self.replay_memory.popleft()
 
@@ -151,10 +165,14 @@ class DQN:
         if self.time_step > self.observe:
             self.train()
 
-        self.log()
-
         self.current_state = new_state
         self.time_step += 1
+
+        # saving network
+        if self.time_step % self.SAVE_EVERY_X_STEPS == 0:
+            self.saver.save(self.session, self.checkpoint_path + "/" \
+                                          + self.game_name + "-dqn",
+                            global_step=self.time_step)
 
     def set_init_state(self, observation):
         self.current_state = np.stack((observation, observation,
@@ -170,24 +188,12 @@ class DQN:
         return tf.Variable(biases)
 
     def conv2d(self, x, weights, stride):
-        return tf.nn.conv2d(x, weights, strides=[1, stride, stride, 1], padding="SAME")
+        return tf.nn.conv2d(x, weights, strides=[1, stride, stride, 1],
+                            padding="SAME")
 
     def max_pool_2x2(self, x):
-        return tf.nn.max_pool(x, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding="SAME")
-
-    def log(self):
-        state = ""
-        if self.time_step <= self.observe:
-            state = "observe"
-        elif self.observe < self.time_step <= self.observe + self.explore:
-            state = "explore"
-        else:
-            state = "train"
-
-        message = "timestamp: {0}, state: {1}, epsilon: {2}".format(self.time_step,
-                                                                    state,
-                                                                    self.epsilon)
-        print(message)
+        return tf.nn.max_pool(x, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1],
+                              padding="SAME")
 
 
 def main():
