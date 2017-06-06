@@ -8,9 +8,6 @@ from flappy_bird import Game
 from dqn import DQN
 
 
-REPLAY_MEMORY = 50000  # number of previous transitions to remember
-OBSERVE = 1000  # timesteps to observe before training
-EXPLORE = 2000  # f
 STATUSES = {"state": 0, "action": 1, "reward": 2,
             "next_state": 3, "terminate": 4
             }

@@ -28,7 +28,7 @@ class Bird(pygame.sprite.Sprite):
             self.y += self.velocity
 
     def lift(self):
-        self.velocity -= Bird.STANDART_SPEED * 20
+        self.velocity -= Bird.STANDART_SPEED * 30
         if self.velocity < self.limit_speed:
             self.velocity = self.limit_speed
 
@@ -177,7 +177,6 @@ class Game:
                     if middle_bird_pos > middle_pipe_pos:
                         self.score += 1
                         pipe.bird_passed = True
-                        reward = 1
 
             # Update bird, pipes and base
             self.bird.update()
@@ -212,13 +211,6 @@ class Game:
         if action[1] == 1:
             self.bird.lift()
 
-        # Check collision
-        if self.check_collision():
-            self.stop()
-            terminal = True
-            self.__init__()
-            reward = -1.0
-
         # Check score
         # Check position bird, pipes and increment
         # score if pipe position less then bird.
@@ -238,8 +230,15 @@ class Game:
             pipe.update()
         self.base.update()
 
+
+        # Check collision
+        if self.check_collision():
+            self.stop()
+            terminal = True
+            reward = -1.0
+            self.__init__()
+
         # Redraw objects
-        # self.screen.fill((0, 0, 0))
         self.screen.blit(self.background, (0, 0))
         self.screen.blit(self.bird.image,
                          (self.bird.x, self.bird.y))
