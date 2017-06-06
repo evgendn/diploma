@@ -146,7 +146,7 @@ class DQN:
         action[action_index] = 1
 
         if self.epsilon > self.final_epsilon and self.time_step > self.observe:
-            self.epsilon -= (self.initial_eplsion - self.final_epsilon) \
+            self.epsilon -= (self.initial_epsilon - self.final_epsilon) \
                             / self.explore
 
         return action, q_value
