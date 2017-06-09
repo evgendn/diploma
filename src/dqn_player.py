@@ -24,8 +24,8 @@ def play():
     # init flappy bird and DQN
     flappy_bird = Game()
     legal_actions = 2
-    dqn = DQN(actions=legal_actions, max_replay_memory=50000, observe=1000,
-              explore=2000, initial_epsilon=1.0, final_epsilon=0.01,
+    dqn = DQN(actions=legal_actions, max_replay_memory=50000, observe=100000,
+              explore=200000, initial_epsilon=0.2, final_epsilon=0.01,
               learning_rate=1e-6, batch_size=32, gamma=0.99,
               statuses=STATUSES, game_name="flappy_bird")
 
@@ -44,13 +44,20 @@ def play():
         while True:
             action, q_value = dqn.get_action()
             next_state, reward, terminal = flappy_bird.next_frame(action)
-            next_state = preprocessing(next_state)
 
             # check preprocessed images
-            if dqn.time_step % 10000 == 0:
+            if dqn.time_step % 10 == 0:
                 if not os.path.exists("logs_png"):
                     os.mkdir("logs_png")
                 cv2.imwrite("logs_png/frame" + str(dqn.time_step) + ".png",
+                            next_state)
+            next_state = preprocessing(next_state)
+
+            # check preprocessed images
+            if dqn.time_step % 10 == 0:
+                if not os.path.exists("logs_png"):
+                    os.mkdir("logs_png")
+                cv2.imwrite("logs_png/framepr" + str(dqn.time_step) + ".png",
                             next_state)
 
             dqn.fit(next_state, action, reward, terminal)

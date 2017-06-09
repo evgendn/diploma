@@ -22,6 +22,7 @@ class Bird(pygame.sprite.Sprite):
         self.old_x = x
         self.old_y = y
 
+
     def update(self):
         if self.moving:
             self.velocity += Bird.GRAVITY
@@ -32,15 +33,18 @@ class Bird(pygame.sprite.Sprite):
         if self.velocity < self.limit_speed:
             self.velocity = self.limit_speed
 
-    def rect(self):
-        return Rect(self.x, self.y,
-                    self.image.get_width(), self.image.get_height())
-
     def reset(self):
         self.x = self.old_x
         self.y = self.old_y
         self.velocity = Bird.STANDART_SPEED
         self.moving = True
+
+    def get_circle(self):
+        bird = {}
+        bird["x"] = self.x + self.image.get_width() // 2
+        bird["y"] = self.y + self.image.get_height() // 2
+        bird["radius"] = 12
+        return bird
 
 
 class Pipe(pygame.sprite.Sprite):
@@ -97,6 +101,21 @@ class Pipe(pygame.sprite.Sprite):
         self.y = self.old_y
         self.moving = True
         self.bird_passed = False
+
+    def get_pipes(self):
+        top_pipe = {}
+        top_pipe["x1"] = self.x
+        top_pipe["x2"] = self.x + self.top_image.get_width()
+        top_pipe["y1"] = self.y["top"]
+        top_pipe["y2"] = self.y["top"] + self.top_image.get_height()
+
+        bottom_pipe = {}
+        bottom_pipe["x1"] = self.x
+        bottom_pipe["x2"] = self.x + self.bottom_image.get_width()
+        bottom_pipe["y1"] = self.y["bottom"]
+        bottom_pipe["y2"] = self.y["bottom"] + self.bottom_image.get_height()
+
+        return top_pipe, bottom_pipe
 
 
 class Base:
@@ -162,9 +181,11 @@ class Game:
                         self.base.reset()
                         self.score = 0
 
-            #Check collision
-            if self.check_collision():
-                self.stop()
+            # Update bird, pipes and base
+            self.bird.update()
+            for pipe in self.pipes:
+                pipe.update()
+            self.base.update()
 
             # Check score
             # Check position bird, pipes and increment
@@ -178,11 +199,9 @@ class Game:
                         self.score += 1
                         pipe.bird_passed = True
 
-            # Update bird, pipes and base
-            self.bird.update()
-            for pipe in self.pipes:
-                pipe.update()
-            self.base.update()
+            #Check collision
+            if self.check_collision():
+                self.stop()
 
             # Redraw objects
             self.screen.blit(self.background, (0, 0))
@@ -211,6 +230,12 @@ class Game:
         if action[1] == 1:
             self.bird.lift()
 
+        # Update bird, pipes and base
+        self.bird.update()
+        for pipe in self.pipes:
+            pipe.update()
+        self.base.update()
+
         # Check score
         # Check position bird, pipes and increment
         # score if pipe position less then bird.
@@ -223,13 +248,6 @@ class Game:
                     self.score += 1
                     pipe.bird_passed = True
                     reward = 1.0
-
-        # Update bird, pipes and base
-        self.bird.update()
-        for pipe in self.pipes:
-            pipe.update()
-        self.base.update()
-
 
         # Check collision
         if self.check_collision():
@@ -255,7 +273,7 @@ class Game:
 
     def check_collision(self):
         # top window border and bird, base and bird
-        if self.bird.y + self.bird.image.get_height() > self.base.y:
+        if self.bird.y + self.bird.image.get_height() - 5 > self.base.y:
             self.bird.y = self.base.y - self.bird.image.get_height()
             return True
         elif self.bird.y < 0:
@@ -263,11 +281,20 @@ class Game:
             return True
 
         # Pipes and bird
+        bird = self.bird.get_circle()
+        top_hit = False
+        bottom_hit = False
         for pipe in self.pipes:
-            top_rect, bottom_rect = pipe.rect()
-            if self.bird.rect().colliderect(top_rect) \
-                    or self.bird.rect().colliderect(bottom_rect):
+            top_pipe, bottom_pipe = pipe.get_pipes()
+
+            top_hit = is_intersect(bird, top_pipe)
+            if top_hit:
                 return True
+
+            bottom_hit = is_intersect(bird, bottom_pipe)
+            if bottom_hit:
+                return True
+
 
     def stop(self):
         self.bird.moving = False
@@ -290,6 +317,12 @@ class Game:
 
     def get_resolutoin(self):
         return self.WINDOW_WIDTH, self.WINDOW_HEIGHT
+
+
+def is_intersect(circle, rectangle):
+    delta_x = circle["x"] - max(rectangle["x1"], min(circle["x"], rectangle["x2"]))
+    delta_y = circle["y"] - max(rectangle["y1"], min(circle["y"], rectangle["y2"]))
+    return(delta_x ** 2 + delta_y ** 2) < (circle["radius"] ** 2)
 
 
 def main():
